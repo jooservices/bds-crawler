@@ -1,0 +1,19 @@
+target-version = "py312"
+line-length = 120
+
+[lint]
+select = ["E", "F", "W", "I", "B", "SIM", "RUF", "FURB", "S", "PL", "UP"]
+ignore = [
+    "BLE001",   # scraper intentionally catches broad exceptions (resilience)
+    "S110",     # try-except-pass intentional (best-effort browser ops)
+    "S112",     # try-except-continue intentional (retry loops)
+    "SIM105",   # suppress-in-loop retry patterns are clearer as try/except
+    "S101",     # assert in pytest tests
+    "PLR2004",  # magic-value comparisons (config/tests)
+    "PLR0912",  # scraper functions are branch-heavy by nature
+    "PLR0915",  # scraper functions are statement-heavy by nature
+    "S603",     # subprocess with static, non-tainted args
+    "S607",     # subprocess with static executable paths
+    "S108",     # hardcoded tmp paths for the Chrome profile
+    "E501",     # long URL/regex/test lines
+]

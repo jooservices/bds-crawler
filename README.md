@@ -1,10 +1,15 @@
 # jooservices/bds-crawler
 
-**Status: POC — branch model may be bypassed.** This project is a proof of
-concept crawler for Vietnam's largest real estate portal
+[![CI](https://github.com/jooservices/bds-crawler/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/jooservices/bds-crawler/actions/workflows/ci.yml)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/jooservices/bds-crawler/badge)](https://securityscorecards.dev/viewer/?uri=github.com/jooservices/bds-crawler)
+[![Python Version](https://img.shields.io/badge/Python-3.12%2B-blue.svg)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+A 24/7 crawler for Vietnam's largest real estate portal
 [batdongsan.com.vn](https://batdongsan.com.vn). It bypasses Cloudflare using a
 real (non-automated) headful Chrome attached over CDP, extracts full listing
-data into a normalized SQLite store, and is built to run 24/7.
+data into a normalized SQLite store, and runs continuously with delta
+re-crawls.
 
 - **Language:** Python 3.12+ (Playwright + SQLite)
 - **Host constraint:** the Cloudflare bypass currently works **only with
@@ -75,6 +80,7 @@ python3 -m venv .venv
 - [Data model](docs/03-operations/data-model.md)
 - [Admin-unit compatibility](docs/03-operations/admin-compatibility.md)
 - [Audit report](docs/03-operations/audit.md)
+- [Workflows](WORKFLOWS.md)
 - [Changelog](CHANGELOG.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security](SECURITY.md)
@@ -82,7 +88,9 @@ python3 -m venv .venv
 ## Development
 
 ```bash
-.venv/bin/python -m pytest tests/ -q     # unit tests (parser + geo resolver)
+.venv/bin/python -m pytest tests/ -q              # unit tests (parser + geo resolver)
+.venv/bin/ruff check .                            # lint
+.venv/bin/ruff format --check .                   # format check
 .venv/bin/python -u crawler.py --rebuild --quick --limit 20   # smoke crawl
 ```
 

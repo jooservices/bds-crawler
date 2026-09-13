@@ -1,4 +1,5 @@
 """DB helpers: connect, init/rebuild, seed geo + queue."""
+
 import os
 import sqlite3
 import time
@@ -41,13 +42,13 @@ def seed_geo(con):
     c = con.execute("SELECT COUNT(*) FROM categories").fetchone()[0]
     if c == 0:
         ids = {}
-        for i, (slug, (name, txn, parent)) in enumerate(config.CATEGORIES.items()):
+        for i, (slug, (name, txn, _parent)) in enumerate(config.CATEGORIES.items()):
             cur = con.execute(
                 "INSERT INTO categories (name, slug, txn_type, parent_id, sort_order) VALUES (?,?,?,?,?)",
                 (name, slug, txn, None, i),
             )
             ids[slug] = cur.lastrowid
-        for slug, (name, txn, parent) in config.CATEGORIES.items():
+        for slug, (_name, _txn, parent) in config.CATEGORIES.items():
             if parent:
                 con.execute("UPDATE categories SET parent_id=? WHERE slug=?", (ids[parent], slug))
     con.commit()
@@ -74,9 +75,7 @@ def seed_queue(con, quick=False, cats_limit=4, cities_limit=3, page_cap=None):
     for cat in cats:
         for city in cities:
             rows.append((f"https://batdongsan.com.vn/{cat}-{city}", "listing_page"))
-    con.executemany(
-        "INSERT OR IGNORE INTO crawl_queue (url, kind, status) VALUES (?,?, 'pending')", rows
-    )
+    con.executemany("INSERT OR IGNORE INTO crawl_queue (url, kind, status) VALUES (?,?, 'pending')", rows)
     con.commit()
     return len(rows)
 
@@ -100,8 +99,12 @@ def finish_run(con, run_id, stats, status="done"):
     con.execute(
         "UPDATE crawl_runs SET finished_at=?, status=?, pages_fetched=?, listings_new=?, listings_updated=?, failures=? WHERE id=?",
         (
-            time.strftime("%Y-%m-%d %H:%M:%S"), status,
-            stats.get("pages", 0), stats.get("new", 0), stats.get("updated", 0), stats.get("failures", 0),
+            time.strftime("%Y-%m-%d %H:%M:%S"),
+            status,
+            stats.get("pages", 0),
+            stats.get("new", 0),
+            stats.get("updated", 0),
+            stats.get("failures", 0),
             run_id,
         ),
     )

@@ -1,4 +1,5 @@
 """Chrome watchdog session: launch real Chrome, connect via CDP, restart on death."""
+
 import os
 import subprocess
 import time
@@ -28,7 +29,7 @@ class ChromeSession:
             config.WARMUP,
         ]
         if os.environ.get("BDS_NO_SANDBOX", "1") == "1":
-            args.insert(4, "--no-sandbox")   # on by default; disable for non-root Docker (BDS_NO_SANDBOX=0)
+            args.insert(4, "--no-sandbox")  # on by default; disable for non-root Docker (BDS_NO_SANDBOX=0)
         self.proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         for _ in range(60):
             if self._cdp_alive():
@@ -47,7 +48,7 @@ class ChromeSession:
         return self._cdp_alive()
 
     def kill(self):
-        subprocess.run(["pkill", "-9", "-f", f"remote-debugging-port={config.PORT}"], capture_output=True)
+        subprocess.run(["pkill", "-9", "-f", f"remote-debugging-port={config.PORT}"], capture_output=True, check=False)
         if self.proc:
             try:
                 self.proc.kill()
