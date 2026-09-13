@@ -17,6 +17,7 @@ Audit scope: correctness, performance, security, and robustness of the crawler
 | FTS5 search | ✅ `MATCH 'chung'` returns rows |
 | Resume after crash | ✅ queue persists; orphaned `in_progress` reset on startup |
 | Graceful shutdown | ✅ SIGINT/SIGTERM → clean close, `crawl_runs` recorded |
+| CI (ruff + pytest, ubuntu-latest) | ✅ `ruff check` / `ruff format --check` / `pytest` all green |
 
 ## Issues found & fixed in this audit
 

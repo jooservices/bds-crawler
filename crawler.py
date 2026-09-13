@@ -8,6 +8,7 @@ Features:
 - Delta mode: re-crawl active listings periodically (--loop)
 - Logging to file + console, crawl_runs tracking, graceful shutdown
 """
+
 import argparse
 import asyncio
 import json
@@ -111,7 +112,10 @@ class Crawler:
                 (config.MAX_ATTEMPTS,),
             ).fetchone()
         if row:
-            self.con.execute("UPDATE crawl_queue SET status='in_progress', last_attempt_at=? WHERE id=?", (time.strftime("%Y-%m-%d %H:%M:%S"), row["id"]))
+            self.con.execute(
+                "UPDATE crawl_queue SET status='in_progress', last_attempt_at=? WHERE id=?",
+                (time.strftime("%Y-%m-%d %H:%M:%S"), row["id"]),
+            )
             self.con.commit()
             return dict(row)
         return None
@@ -123,9 +127,15 @@ class Crawler:
             row = self.con.execute("SELECT attempts FROM crawl_queue WHERE id=?", (qid,)).fetchone()
             a = (row["attempts"] if row else 0) + 1
             if a >= config.MAX_ATTEMPTS:
-                self.con.execute("UPDATE crawl_queue SET status='failed', attempts=?, last_error=?, last_attempt_at=? WHERE id=?", (a, error[:300], time.strftime("%Y-%m-%d %H:%M:%S"), qid))
+                self.con.execute(
+                    "UPDATE crawl_queue SET status='failed', attempts=?, last_error=?, last_attempt_at=? WHERE id=?",
+                    (a, error[:300], time.strftime("%Y-%m-%d %H:%M:%S"), qid),
+                )
             else:
-                self.con.execute("UPDATE crawl_queue SET status='pending', attempts=?, last_error=?, last_attempt_at=? WHERE id=?", (a, error[:300], time.strftime("%Y-%m-%d %H:%M:%S"), qid))
+                self.con.execute(
+                    "UPDATE crawl_queue SET status='pending', attempts=?, last_error=?, last_attempt_at=? WHERE id=?",
+                    (a, error[:300], time.strftime("%Y-%m-%d %H:%M:%S"), qid),
+                )
         self.con.commit()
 
     def enqueue(self, url, kind):
@@ -165,7 +175,16 @@ class Crawler:
             except Exception as e:
                 msg = str(e)[:120]
                 # browser-level issue -> watchdog (invalidate stale connection, then reconnect)
-                if any(x in msg for x in ("has been closed", "Connection closed", "Target closed", "Target crashed", "context, or browser")):
+                if any(
+                    x in msg
+                    for x in (
+                        "has been closed",
+                        "Connection closed",
+                        "Target closed",
+                        "Target crashed",
+                        "context, or browser",
+                    )
+                ):
                     self.session.invalidate()
                 try:
                     await self.session.ensure(self.pw)
@@ -193,8 +212,8 @@ class Crawler:
     # ---------- processing ----------
     def process_listing_page(self, url, html):
         links, max_page = parse_listing_page(html, url)
-        for l in links:
-            self.enqueue(l, "detail")
+        for link in links:
+            self.enqueue(link, "detail")
         base = url.split("/p")[0] if "/p" in url else url
         cap = self.args.page_cap
         self.enqueue_pages(base, max_page, cap=cap)
@@ -213,17 +232,32 @@ class Crawler:
         # agent first (listings.agent_id FK)
         if rec["agent_id"]:
             a = self.con.execute("SELECT id FROM agents WHERE id=?", (rec["agent_id"],)).fetchone()
-            params = dict(p.split("=") for p in rec["agent_params"].lstrip("?").split("&") if "=" in p) if rec["agent_params"] else {}
+            params = (
+                dict(p.split("=") for p in rec["agent_params"].lstrip("?").split("&") if "=" in p)
+                if rec["agent_params"]
+                else {}
+            )
             if a is None:
                 self.con.execute(
                     "INSERT INTO agents (id, name, profile_url, product_type, cate_id, project_id, city_code, district_id, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
-                    (rec["agent_id"], rec["agent_name"], rec["agent_url"],
-                     params.get("productType"), params.get("cateId"), params.get("projectId"),
-                     params.get("cityCode"), params.get("districtId"), now, now),
+                    (
+                        rec["agent_id"],
+                        rec["agent_name"],
+                        rec["agent_url"],
+                        params.get("productType"),
+                        params.get("cateId"),
+                        params.get("projectId"),
+                        params.get("cityCode"),
+                        params.get("districtId"),
+                        now,
+                        now,
+                    ),
                 )
             else:
-                self.con.execute("UPDATE agents SET name=?, profile_url=?, updated_at=? WHERE id=?",
-                                 (rec["agent_name"], rec["agent_url"], now, rec["agent_id"]))
+                self.con.execute(
+                    "UPDATE agents SET name=?, profile_url=?, updated_at=? WHERE id=?",
+                    (rec["agent_name"], rec["agent_url"], now, rec["agent_id"]),
+                )
 
         existing = self.con.execute("SELECT * FROM listings WHERE id=?", (listing_id,)).fetchone()
 
@@ -243,13 +277,47 @@ class Crawler:
                    gps_lat, gps_lng, posted_at, expiry_at, tier, status, agent_id, published_at, modified_at,
                    description, specs, first_seen_at, last_seen_at, created_at, updated_at)
                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                (listing_id, rec["url"], rec["title"], category_id, txn, rec["price_text"], rec["price_vnd"],
-                 rec["price_per_m2"], rec["area_m2"], rec["bedrooms"], rec["bathrooms"], rec["floors"],
-                 rec["facade_m"], rec["road_m"], rec["direction"], rec["balcony_dir"], rec["legal_status"],
-                 rec["interior"], rec["address_text"], rec["street_text"], rec["city_id"], rec["district_id"],
-                 rec["ward_id"], rec["street_id"], rec["gps_lat"], rec["gps_lng"], rec["posted_at"],
-                 rec["expiry_at"], rec["tier"], status, rec["agent_id"] or None, rec["published_at"], rec["modified_at"],
-                 rec["description"], json.dumps(rec["specs"], ensure_ascii=False), now, now, now, now),
+                (
+                    listing_id,
+                    rec["url"],
+                    rec["title"],
+                    category_id,
+                    txn,
+                    rec["price_text"],
+                    rec["price_vnd"],
+                    rec["price_per_m2"],
+                    rec["area_m2"],
+                    rec["bedrooms"],
+                    rec["bathrooms"],
+                    rec["floors"],
+                    rec["facade_m"],
+                    rec["road_m"],
+                    rec["direction"],
+                    rec["balcony_dir"],
+                    rec["legal_status"],
+                    rec["interior"],
+                    rec["address_text"],
+                    rec["street_text"],
+                    rec["city_id"],
+                    rec["district_id"],
+                    rec["ward_id"],
+                    rec["street_id"],
+                    rec["gps_lat"],
+                    rec["gps_lng"],
+                    rec["posted_at"],
+                    rec["expiry_at"],
+                    rec["tier"],
+                    status,
+                    rec["agent_id"] or None,
+                    rec["published_at"],
+                    rec["modified_at"],
+                    rec["description"],
+                    json.dumps(rec["specs"], ensure_ascii=False),
+                    now,
+                    now,
+                    now,
+                    now,
+                ),
             )
             self.con.execute(
                 "INSERT INTO price_history (listing_id, price_text, price_vnd, price_per_m2, area_m2, captured_at) VALUES (?,?,?,?,?,?)",
@@ -283,13 +351,45 @@ class Crawler:
                    ward_id=?, street_id=?, gps_lat=?, gps_lng=?, posted_at=?, expiry_at=?, tier=?, status=?,
                    agent_id=?, published_at=?, modified_at=?, description=?, specs=?, last_seen_at=?, updated_at=?
                    WHERE id=?""",
-                (rec["url"], rec["title"], category_id, txn, rec["price_text"], rec["price_vnd"],
-                 rec["price_per_m2"], rec["area_m2"], rec["bedrooms"], rec["bathrooms"], rec["floors"],
-                 rec["facade_m"], rec["road_m"], rec["direction"], rec["balcony_dir"], rec["legal_status"],
-                 rec["interior"], rec["address_text"], rec["street_text"], rec["city_id"], rec["district_id"],
-                 rec["ward_id"], rec["street_id"], rec["gps_lat"], rec["gps_lng"], rec["posted_at"],
-                 rec["expiry_at"], rec["tier"], status, rec["agent_id"] or None, rec["published_at"], rec["modified_at"],
-                 rec["description"], json.dumps(rec["specs"], ensure_ascii=False), now, now, listing_id),
+                (
+                    rec["url"],
+                    rec["title"],
+                    category_id,
+                    txn,
+                    rec["price_text"],
+                    rec["price_vnd"],
+                    rec["price_per_m2"],
+                    rec["area_m2"],
+                    rec["bedrooms"],
+                    rec["bathrooms"],
+                    rec["floors"],
+                    rec["facade_m"],
+                    rec["road_m"],
+                    rec["direction"],
+                    rec["balcony_dir"],
+                    rec["legal_status"],
+                    rec["interior"],
+                    rec["address_text"],
+                    rec["street_text"],
+                    rec["city_id"],
+                    rec["district_id"],
+                    rec["ward_id"],
+                    rec["street_id"],
+                    rec["gps_lat"],
+                    rec["gps_lng"],
+                    rec["posted_at"],
+                    rec["expiry_at"],
+                    rec["tier"],
+                    status,
+                    rec["agent_id"] or None,
+                    rec["published_at"],
+                    rec["modified_at"],
+                    rec["description"],
+                    json.dumps(rec["specs"], ensure_ascii=False),
+                    now,
+                    now,
+                    listing_id,
+                ),
             )
             self.stats["updated"] += 1
 
@@ -306,8 +406,10 @@ class Crawler:
             )
 
         # snapshot
-        self.con.execute("INSERT INTO raw_snapshots (listing_id, payload) VALUES (?,?)",
-                         (listing_id, json.dumps(rec, ensure_ascii=False)))
+        self.con.execute(
+            "INSERT INTO raw_snapshots (listing_id, payload) VALUES (?,?)",
+            (listing_id, json.dumps(rec, ensure_ascii=False)),
+        )
         return listing_id
 
     # ---------- worker ----------
@@ -423,7 +525,9 @@ class Crawler:
         finally:
             if delta_task:
                 delta_task.cancel()
-            dbmod.finish_run(self.con, self.run_id, self.stats, status="done" if not self.stop.is_set() else "interrupted")
+            dbmod.finish_run(
+                self.con, self.run_id, self.stats, status="done" if not self.stop.is_set() else "interrupted"
+            )
             logger.info("run finished: %s", self.stats)
             await self.session.close()
             self.con.close()
@@ -434,6 +538,7 @@ def _signal(crawler):
     def handler(signum, frame):
         logger.info("signal %s -> graceful shutdown", signum)
         crawler.stop.set()
+
     return handler
 
 

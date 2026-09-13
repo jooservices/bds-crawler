@@ -35,7 +35,7 @@ Seed rows in `config.LOCATION_ALIASES` — `(old_name, old_type, old_parent,
 new_name, new_type, new_parent, note, source)`:
 
 ```python
-("6", "ward", "Quận 3", "Xuân Hòa", "ward", "TP.HCM", "6+7+8->Võ Thị Sáu(2020)->Xuân Hòa(2025)", "NQ1111/NQ1685"),
+(("6", "ward", "Quận 3", "Xuân Hòa", "ward", "TP.HCM", "6+7+8->Võ Thị Sáu(2020)->Xuân Hòa(2025)", "NQ1111/NQ1685"),)
 ```
 
 Names are **bare** (no `Phường`/`Quận` prefix) because the address parser

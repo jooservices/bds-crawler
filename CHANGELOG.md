@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- CI workflow (`.github/workflows/ci.yml`) — Ruff lint + format check + pytest
+  on GitHub-hosted `ubuntu-latest` runners (network-free suite).
+- OpenSSF Scorecard workflow (`.github/workflows/scorecard.yml`).
+- `WORKFLOWS.md` documenting triggers, runners, and required checks.
+- `requirements-dev.txt` (ruff, pytest) and `ruff.toml` config.
+- README badges (CI, Scorecard, Python, License).
+- `make lint` / `make format-check` / `make check` targets.
 - Initial POC crawler for batdongsan.com.vn.
 - Real-Chrome + CDP Cloudflare bypass (headful, non-automated browser).
 - Persistent SQLite queue (`crawl_queue`) with resume-after-crash and dedupe.

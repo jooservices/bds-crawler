@@ -1,4 +1,5 @@
 """Parsers: listing page, detail page, price/area normalization, location resolution."""
+
 import json
 import re
 import unicodedata
@@ -63,8 +64,7 @@ def parse_listing_page(html, base_url):
             n = int(m.group(2))
         except ValueError:
             continue
-        if n > max_page:
-            max_page = n
+        max_page = max(max_page, n)
     return links, max_page
 
 
@@ -73,14 +73,16 @@ def _specs(html):
     specs = {}
     for m in re.finditer(
         r're__pr-short-info-item[^"]*"[^>]*>.*?<span class="title">(.*?)</span>\s*<span class="value">(.*?)</span>',
-        html, re.S,
+        html,
+        re.DOTALL,
     ):
         k, v = clean(re.sub(r"<[^>]+>", "", m.group(1))), clean(re.sub(r"<[^>]+>", "", m.group(2)))
         if k and v:
             specs[k] = v
     for m in re.finditer(
         r're__pr-specs-content-item">.*?re__pr-specs-content-item-title">(.*?)</span>\s*<span class="re__pr-specs-content-item-value">(.*?)</span>',
-        html, re.S,
+        html,
+        re.DOTALL,
     ):
         k, v = clean(re.sub(r"<[^>]+>", "", m.group(1))), clean(re.sub(r"<[^>]+>", "", m.group(2)))
         if k and v:
@@ -89,7 +91,7 @@ def _specs(html):
 
 
 def parse_detail(html, url, resolver=None, city_hint=None):
-    def txt(pattern, flags=re.S):
+    def txt(pattern, flags=re.DOTALL):
         m = re.search(pattern, html, flags)
         return clean(re.sub(r"<[^>]+>", " ", m.group(1))) if m else ""
 
@@ -110,12 +112,22 @@ def parse_detail(html, url, resolver=None, city_hint=None):
 
     images = re.findall(r'<meta[^>]+property="og:image"[^>]+content="([^"]+)"', html)
     if not images:
-        images = list(dict.fromkeys(re.findall(r'https://file\d?\.batdongsan\.com\.vn/(?:resize|origin)?/?[^"\s#]+?\.(?:jpg|jpeg|png|webp)', html)))
-    video = [u for u in dict.fromkeys(re.findall(r'https://[^"\s]+?\.mp4[^"\s]*', html)) if "#~" not in u and "&quot;" not in u]
+        images = list(
+            dict.fromkeys(
+                re.findall(
+                    r'https://file\d?\.batdongsan\.com\.vn/(?:resize|origin)?/?[^"\s#]+?\.(?:jpg|jpeg|png|webp)', html
+                )
+            )
+        )
+    video = [
+        u
+        for u in dict.fromkeys(re.findall(r'https://[^"\s]+?\.mp4[^"\s]*', html))
+        if "#~" not in u and "&quot;" not in u
+    ]
     vt = re.search(r'https://vn1-cdn\.pgimgs\.com/[^"\s]+?\.(?:jpg|jpeg|png)', html)
     video_thumb = vt.group(0) if vt else ""
 
-    gps = re.search(r'maps/embed/v1/place\?q=(-?[\d.]+),(-?[\d.]+)', html)
+    gps = re.search(r"maps/embed/v1/place\?q=(-?[\d.]+),(-?[\d.]+)", html)
     gps_lat, gps_lng = (gps.group(1), gps.group(2)) if gps else (None, None)
 
     agent = re.search(r'(guru\.batdongsan\.com\.vn/pa/([0-9a-f]+)(\?[^"\s]+)?)', html)
@@ -127,7 +139,7 @@ def parse_detail(html, url, resolver=None, city_hint=None):
         agent_name = txt(r'class="re__contact-name[^"]*"[^>]*>(.*?)</a>')
 
     published = modified = category = ""
-    for blk in re.findall(r'<script[^>]*type="application/ld\+json"[^>]*>(.*?)</script>', html, re.S):
+    for blk in re.findall(r'<script[^>]*type="application/ld\+json"[^>]*>(.*?)</script>', html, re.DOTALL):
         try:
             d = json.loads(blk)
         except Exception:
@@ -201,7 +213,7 @@ def _spec_int(specs, keys):
 
 
 def match_category(con, url, cache=None):
-    """Match category by URL first-segment prefix. cache = rows từ SELECT id,slug,txn_type."""
+    """Match category by URL first-segment prefix. cache = rows from SELECT id,slug,txn_type."""
     cats = cache if cache is not None else con.execute("SELECT id, slug, txn_type FROM categories").fetchall()
     m = re.search(r"batdongsan\.com\.vn/([^/]+)/", url)
     if not m:
@@ -209,9 +221,8 @@ def match_category(con, url, cache=None):
     seg = m.group(1) if m else ""
     best, best_id = None, None
     for r in cats:
-        if r["slug"] and seg.startswith(r["slug"]):
-            if best is None or len(r["slug"]) > len(best):
-                best, best_id = r["slug"], r["id"]
+        if r["slug"] and seg.startswith(r["slug"]) and (best is None or len(r["slug"]) > len(best)):
+            best, best_id = r["slug"], r["id"]
     return best_id
 
 
@@ -229,7 +240,7 @@ class LocResolver:
             "ORDER BY (old_parent IS NOT NULL) DESC, id LIMIT 1",
             (old_name, old_type, old_parent or ""),
         ).fetchone()
-        return row if row else None
+        return row or None
 
     def log_unresolved(self, address_text, city_hint, reason):
         try:
@@ -258,10 +269,10 @@ class LocResolver:
         for p in list(parts):
             pl = p.lower()
             if any(k in pl for k in ("phường", "xã", "thị trấn", "tt.")):
-                ward_name = re.sub(r"^(phường|xã|thị trấn|tt\.?)\s*", "", p, flags=re.I).strip()
+                ward_name = re.sub(r"^(phường|xã|thị trấn|tt\.?)\s*", "", p, flags=re.IGNORECASE).strip()
                 parts.remove(p)
             elif any(k in pl for k in ("quận", "huyện", "thị xã", "tx.", "tp.")):
-                district_name = re.sub(r"^(quận|huyện|thị xã|tx\.?|tp\.?)\s*", "", p, flags=re.I).strip()
+                district_name = re.sub(r"^(quận|huyện|thị xã|tx\.?|tp\.?)\s*", "", p, flags=re.IGNORECASE).strip()
                 parts.remove(p)
 
         # NOTE: the district keeps the site's name (the site still uses old
@@ -271,7 +282,7 @@ class LocResolver:
         if parts:
             first = parts[0]
             if any(k in first.lower() for k in ("đường", "đ.", "số", "số nhà")):
-                street_name = re.sub(r"^(đường|đ\.?|số)\s*", "", first, flags=re.I).strip()
+                street_name = re.sub(r"^(đường|đ\.?|số)\s*", "", first, flags=re.IGNORECASE).strip()
                 parts.remove(first)
             else:
                 street_name = first.strip()
@@ -283,7 +294,9 @@ class LocResolver:
 
         district_id = ward_id = street_id = None
         if district_name:
-            row = self.con.execute("SELECT id FROM districts WHERE city_id=? AND name=?", (city_id, district_name)).fetchone()
+            row = self.con.execute(
+                "SELECT id FROM districts WHERE city_id=? AND name=?", (city_id, district_name)
+            ).fetchone()
             if row:
                 district_id = row["id"]
             else:
@@ -296,11 +309,13 @@ class LocResolver:
             # 1) match by site name (by district, fallback by city when no district)
             if district_id:
                 row = self.con.execute(
-                    "SELECT id FROM wards WHERE district_id=? AND name=?", (district_id, ward_name),
+                    "SELECT id FROM wards WHERE district_id=? AND name=?",
+                    (district_id, ward_name),
                 ).fetchone()
             else:
                 row = self.con.execute(
-                    "SELECT id FROM wards WHERE city_id=? AND name=? ORDER BY id LIMIT 1", (city_id, ward_name),
+                    "SELECT id FROM wards WHERE city_id=? AND name=? ORDER BY id LIMIT 1",
+                    (city_id, ward_name),
                 ).fetchone()
             # 2) alias fallback: old unit -> current name (merger compatibility)
             if row is None:
@@ -309,11 +324,13 @@ class LocResolver:
                     ward_name = a["new_name"]
                     if district_id:
                         row = self.con.execute(
-                            "SELECT id FROM wards WHERE district_id=? AND name=?", (district_id, ward_name),
+                            "SELECT id FROM wards WHERE district_id=? AND name=?",
+                            (district_id, ward_name),
                         ).fetchone()
                     else:
                         row = self.con.execute(
-                            "SELECT id FROM wards WHERE city_id=? AND name=? ORDER BY id LIMIT 1", (city_id, ward_name),
+                            "SELECT id FROM wards WHERE city_id=? AND name=? ORDER BY id LIMIT 1",
+                            (city_id, ward_name),
                         ).fetchone()
             if row:
                 ward_id = row["id"]
@@ -324,7 +341,9 @@ class LocResolver:
                 )
                 ward_id = cur.lastrowid
         if street_name:
-            row = self.con.execute("SELECT id FROM streets WHERE city_id=? AND name=? ORDER BY id LIMIT 1", (city_id, street_name)).fetchone()
+            row = self.con.execute(
+                "SELECT id FROM streets WHERE city_id=? AND name=? ORDER BY id LIMIT 1", (city_id, street_name)
+            ).fetchone()
             if row:
                 street_id = row["id"]
             else:

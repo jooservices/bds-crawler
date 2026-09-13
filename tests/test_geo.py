@@ -1,14 +1,13 @@
 import sqlite3
 
-import pytest
-
 from parser import LocResolver, slugify
 
 
 def make_db():
     con = sqlite3.connect(":memory:")
     con.row_factory = sqlite3.Row
-    con.executescript(open("schema.sql").read())
+    with open("schema.sql") as f:
+        con.executescript(f.read())
     con.execute("INSERT INTO cities (id, code, name, slug) VALUES (1,'HN','Hà Nội','ha-noi')")
     con.execute("INSERT INTO cities (id, code, name, slug) VALUES (2,'HCM','Hồ Chí Minh','tp-hcm')")
     con.execute("INSERT INTO cities (id, code, name, slug) VALUES (3,'DDN','Đà Nẵng','da-nang')")
@@ -27,7 +26,7 @@ def test_slugify():
 def test_resolve_street_ward_district_city():
     con = make_db()
     r = LocResolver(con)
-    city, dist, ward, street, stext = r.resolve("Đường Nguyễn Văn Khạ, Xã Tân An Hội, Huyện Củ Chi, Hồ Chí Minh")
+    city, dist, ward, _, stext = r.resolve("Đường Nguyễn Văn Khạ, Xã Tân An Hội, Huyện Củ Chi, Hồ Chí Minh")
     assert city == 2
     assert dist == 1
     assert ward == 1
@@ -37,7 +36,7 @@ def test_resolve_street_ward_district_city():
 def test_resolve_creates_missing_district():
     con = make_db()
     r = LocResolver(con)
-    city, dist, ward, street, stext = r.resolve("Phường Tây Mỗ, Quận Nam Từ Liêm, Hà Nội")
+    city, dist, _, _, _ = r.resolve("Phường Tây Mỗ, Quận Nam Từ Liêm, Hà Nội")
     assert city == 1
     d = con.execute("SELECT name FROM districts WHERE id=?", (dist,)).fetchone()
     assert d["name"] == "Nam Từ Liêm"
@@ -51,7 +50,7 @@ def test_resolve_alias_renamed_ward():
     )
     con.commit()
     r = LocResolver(con)
-    city, dist, ward, street, stext = r.resolve("17C Hai Bà Trưng, Phường 6, Quận 3, Hồ Chí Minh")
+    city, _, ward, _, _ = r.resolve("17C Hai Bà Trưng, Phường 6, Quận 3, Hồ Chí Minh")
     assert city == 2
     w = con.execute("SELECT name FROM wards WHERE id=?", (ward,)).fetchone()
     assert w["name"] == "Xuân Hòa"
